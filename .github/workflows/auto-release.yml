@@ -1,0 +1,115 @@
+name: Auto Release on Version Change
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'pyproject.toml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (optional, uses pyproject.toml if not provided)'
+        required: false
+        type: string
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create tags and releases
+      id-token: write  # Required for trusted publishing to PyPI
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/grandstream-home-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to check existing tags
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Extract version from pyproject.toml
+        id: get_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          TAG="v$VERSION"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $TAG does not exist"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          TAG="v$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+          echo "Created and pushed tag: $TAG"
+
+      - name: Install build dependencies
+        if: steps.check_tag.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        if: steps.check_tag.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+        run: |
+          python -m build
+
+      - name: Check package
+        if: steps.check_tag.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+        run: |
+          twine check dist/*
+
+      - name: Publish to PyPI
+        if: steps.check_tag.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          EXISTS="${{ steps.check_tag.outputs.exists }}"
+
+          if [ "$EXISTS" == "true" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "ℹ️ Tag v$VERSION already exists, skipping release"
+          else
+            echo "✅ Created new tag v$VERSION, published to PyPI and created GitHub Release"
+          fi
