@@ -8,11 +8,13 @@ DEFAULT_PORT = 443  # Default HTTPS port for GDS devices
 DEFAULT_HTTP_PORT = 5000
 DEFAULT_HTTPS_PORT = 5001
 DEFAULT_USERNAME = "gdsha"
+DEFAULT_USERNAME_GNS = "admin"
 DEFAULT_RTSP_PORT = 554
 
 # Device Types
 DEVICE_TYPE_GDS = "GDS"
 DEVICE_TYPE_GNS_NAS = "GNS"
+DEVICE_TYPE_GSC = "GSC"  # GSC devices use GDS API internally
 
 # Door unlock API constants
 ACCESS_TOKEN_TTL = 3300  # 55 minutes in seconds
