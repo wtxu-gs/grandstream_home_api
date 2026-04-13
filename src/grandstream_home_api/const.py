@@ -1,5 +1,7 @@
 """Constants for Grandstream Home API library."""
 
+from typing import Final, Literal
+
 # Version information
 INTEGRATION_VERSION = "1.0.0"
 
@@ -8,11 +10,13 @@ DEFAULT_PORT = 443  # Default HTTPS port for GDS devices
 DEFAULT_HTTP_PORT = 5000
 DEFAULT_HTTPS_PORT = 5001
 DEFAULT_USERNAME = "gdsha"
+DEFAULT_USERNAME_GNS = "admin"
 DEFAULT_RTSP_PORT = 554
 
 # Device Types
-DEVICE_TYPE_GDS = "GDS"
-DEVICE_TYPE_GNS_NAS = "GNS"
+DEVICE_TYPE_GDS: Final[Literal["GDS"]] = "GDS"
+DEVICE_TYPE_GNS_NAS: Final[Literal["GNS"]] = "GNS"
+DEVICE_TYPE_GSC: Final[Literal["GSC"]] = "GSC"  # GSC devices use GDS API internally
 
 # Door unlock API constants
 ACCESS_TOKEN_TTL = 3300  # 55 minutes in seconds
