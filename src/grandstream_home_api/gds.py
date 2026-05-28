@@ -63,6 +63,7 @@ ENDPOINT_PHONE_STATUS = "api-get_phone_status"
 ENDPOINT_GDS_GNS_CONFIG = "api-gds_gns_config"
 ENDPOINT_SYS_OPERATION = "api-sys_operation"
 ENDPOINT_GET_ACCOUNTS = "api-get_accounts"  # Get SIP accounts status
+ENDPOINT_GET_RTSP_INFO = "api-get_rtsp_info"  # Get RTSP configuration
 
 # Default Values
 DEFAULT_RTSP_PORT = 554
@@ -922,6 +923,30 @@ class GDSPhoneAPI:
 
     @_require_auth
     @_handle_session_retry
+    def get_rtsp_info(self) -> dict[str, Any]:
+        """Get RTSP configuration from device.
+
+        Returns:
+            RTSP info dictionary with format:
+            Success: {"response": "success", "body": {"rtspEnable": int, "rtspPort": int, "rtspAuth": int}}
+            - rtspEnable: 1=enabled, 0=disabled
+            - rtspPort: RTSP port number
+            - rtspAuth: 1=digest auth, 0=basic auth
+            Failure: {}
+
+        """
+        headers = self._build_headers()
+        response = self._make_request(
+            HTTP_METHOD_GET, ENDPOINT_GET_RTSP_INFO, headers=headers
+        )
+
+        if response.get("response") == RESPONSE_SUCCESS:
+            _LOGGER.debug("RTSP info retrieved: %s", response)
+
+        return response
+
+    @_require_auth
+    @_handle_session_retry
     def reboot_device(self) -> dict[str, Any]:
         """Reboot the device.
 
@@ -936,8 +961,11 @@ class GDSPhoneAPI:
         _LOGGER.info("Reboot response: %s", response)
         return response
 
-    def get_rtsp_url(self) -> str:
+    def get_rtsp_url(self, rtsp_port: int | None = None) -> str:
         """Get RTSP streaming URL.
+
+        Args:
+            rtsp_port: RTSP port from device, defaults to DEFAULT_RTSP_PORT if not provided
 
         Returns:
             RTSP URL string
@@ -954,32 +982,32 @@ class GDSPhoneAPI:
         if not self.host:
             raise GrandstreamRTSPError("Host is not configured")
 
-        rtsp_port = DEFAULT_RTSP_PORT
+        port = rtsp_port if rtsp_port is not None else DEFAULT_RTSP_PORT
 
         # Check port reachability
         try:
             sock = socket.create_connection(
-                (self.host, rtsp_port), timeout=GDS_TIMEOUT_SOCKET_CHECK
+                (self.host, port), timeout=GDS_TIMEOUT_SOCKET_CHECK
             )
             sock.close()
         except OSError:
             _LOGGER.warning(
                 "RTSP port %s on %s is unreachable. Ensure RTSP is enabled",
-                rtsp_port,
+                port,
                 self.host,
             )
 
         host_url = format_host_url(self.host)
         rtsp_url = (
             f"rtsp://{self.rtsp_username}:{self.rtsp_password}@"
-            f"{host_url}:{rtsp_port}{RTSP_SUB_STREAM}"
+            f"{host_url}:{port}{RTSP_SUB_STREAM}"
         )
 
         _LOGGER.info(
             "RTSP URL generated: rtsp://%s:***@%s:%s%s",
             self.rtsp_username,
             host_url,
-            rtsp_port,
+            port,
             RTSP_SUB_STREAM,
         )
         return rtsp_url
