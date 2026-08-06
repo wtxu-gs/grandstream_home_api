@@ -463,6 +463,7 @@ class GDSPhoneAPI:
                 data=data,
                 json=json_data,
                 headers=headers,
+                verify=self.session.verify,
                 timeout=(GDS_TIMEOUT_CONNECT, GDS_TIMEOUT_READ),
             )
 

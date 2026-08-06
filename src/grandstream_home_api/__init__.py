@@ -13,6 +13,9 @@ from grandstream_home_api.const import (
     DEVICE_TYPE_GDS,
     DEVICE_TYPE_GNS_NAS,
     DEVICE_TYPE_GSC,
+    DEVICE_TYPE_GWN_AP,
+    DEVICE_TYPE_GWN_ROUTER,
+    DEVICE_TYPE_GWN_SWITCH,
     DOOR_ACTION_LOCK,
     DOOR_ACTION_UNLOCK,
     GDS_TIMEOUT_CONNECT,
@@ -43,10 +46,12 @@ from grandstream_home_api.error import (
 )
 from grandstream_home_api.gds import GDSPhoneAPI
 from grandstream_home_api.gns import GNSNasAPI
+from grandstream_home_api.gwn_switch import GWNSwitchAPI
 from grandstream_home_api.utils import (
     attempt_login,
     build_sip_account_dict,
     create_api_instance,
+    create_device_api_instance,
     decrypt_password,
     detect_device_type,
     determine_device_type_from_product,
@@ -55,6 +60,7 @@ from grandstream_home_api.utils import (
     extract_port_from_txt,
     fetch_gds_status,
     fetch_gns_metrics,
+    fetch_gwn_switch_metrics,
     fetch_sip_accounts,
     format_host_url,
     generate_unique_id,
@@ -78,6 +84,7 @@ __all__ = [
     # API classes
     "GDSPhoneAPI",
     "GNSNasAPI",
+    "GWNSwitchAPI",
     # Exceptions
     "GrandstreamError",
     "GrandstreamLoginError",
@@ -91,6 +98,7 @@ __all__ = [
     "attempt_login",
     "build_sip_account_dict",
     "create_api_instance",
+    "create_gds_api_instance",
     "decrypt_password",
     "detect_device_type",
     "determine_device_type_from_product",
@@ -99,6 +107,7 @@ __all__ = [
     "extract_port_from_txt",
     "fetch_gds_status",
     "fetch_gns_metrics",
+    "fetch_gwn_switch_metrics",
     "fetch_sip_accounts",
     "format_host_url",
     "generate_unique_id",
@@ -129,6 +138,9 @@ __all__ = [
     "DEVICE_TYPE_GDS",
     "DEVICE_TYPE_GNS_NAS",
     "DEVICE_TYPE_GSC",
+    "DEVICE_TYPE_GWN_SWITCH",
+    "DEVICE_TYPE_GWN_ROUTER",
+    "DEVICE_TYPE_GWN_AP",
     "DOOR_ACTION_LOCK",
     "DOOR_ACTION_UNLOCK",
     "GDS_TIMEOUT_CONNECT",

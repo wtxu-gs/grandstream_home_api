@@ -14,12 +14,14 @@ import urllib3
 from grandstream_home_api.const import (
     DEVICE_TYPE_GDS,
     DEVICE_TYPE_GNS_NAS,
+    DEVICE_TYPE_GWN_SWITCH,
 )
 from grandstream_home_api.error import GrandstreamHAControlDisabledError
 
 if TYPE_CHECKING:
     from grandstream_home_api.gds import GDSPhoneAPI
     from grandstream_home_api.gns import GNSNasAPI
+    from grandstream_home_api.gwn_switch import GWNSwitchAPI
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -232,7 +234,7 @@ def get_by_path(data: dict[str, Any], path: str, index: int | None = None) -> An
 
 def detect_device_type(
     host: str, timeout: float = 5.0
-) -> Literal["GDS", "GNS_NAS"] | None:
+) -> Literal["GDS", "GNS_NAS", "GWN_SWITCH"] | None:
     """Detect device type by probing the device.
 
     This function attempts to determine the device type by checking
@@ -278,6 +280,26 @@ def detect_device_type(
         except (requests.RequestException, OSError):
             pass
 
+    # GWN Switch devices use /cgi/get.cgi endpoint on port 443
+    gwn_switch_url = f"https://{formatted_host}:443/cgi/get.cgi?cmd=sys_cpumem"
+    try:
+        response = requests.get(
+            gwn_switch_url,
+            verify=False,
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        if response.status_code in (200, 401, 403):
+            try:
+                data = response.json()
+                # GWN Switch returns {"code": 1, ...} when not authenticated
+                if isinstance(data, dict) and "code" in data:
+                    return DEVICE_TYPE_GWN_SWITCH
+            except json.JSONDecodeError:
+                pass
+    except (requests.RequestException, OSError):
+        pass
+
     # GDS devices use port 443, different API structure
     gds_url = f"https://{formatted_host}:443/"
     try:
@@ -318,7 +340,7 @@ def determine_device_type_from_product(product_name: str) -> str:
         product_name: Product name from device discovery or detection
 
     Returns:
-        Device type string ("GDS" or "GNS")
+        Device type string ("GDS", "GNS", or "GWN_SWITCH")
 
     """
     if not product_name:
@@ -329,6 +351,9 @@ def determine_device_type_from_product(product_name: str) -> str:
     if product_upper.startswith("GNS"):
         return DEVICE_TYPE_GNS_NAS
 
+    if product_upper.startswith("GWN7"):
+        return DEVICE_TYPE_GWN_SWITCH
+
     # GSC and GDS both use GDS API internally
     return DEVICE_TYPE_GDS
 
@@ -336,14 +361,14 @@ def determine_device_type_from_product(product_name: str) -> str:
 def get_device_model_from_product(product_name: str) -> str:
     """Get device model from product name.
 
-    This returns the actual device model (GDS, GSC, or GNS)
+    This returns the actual device model (GDS, GSC, GNS, or GWN_SWITCH)
     unlike determine_device_type_from_product which returns the API type.
 
     Args:
         product_name: Product name from device discovery
 
     Returns:
-        Device model string ("GDS", "GSC", or "GNS")
+        Device model string ("GDS", "GSC", "GNS", or "GWN_SWITCH")
 
     """
     if not product_name:
@@ -355,6 +380,8 @@ def get_device_model_from_product(product_name: str) -> str:
         return DEVICE_TYPE_GNS_NAS
     if product_upper.startswith("GSC"):
         return "GSC"
+    if product_upper.startswith("GWN7"):
+        return DEVICE_TYPE_GWN_SWITCH
 
     return DEVICE_TYPE_GDS
 
@@ -375,7 +402,7 @@ def is_grandstream_device(product_name: str) -> bool:
     product_upper = product_name.strip().upper()
     return any(
         product_upper.startswith(prefix)
-        for prefix in ("GDS", "GSC", "GNS")
+        for prefix in ("GDS", "GSC", "GNS", "GWN")
     )
 
 
@@ -419,11 +446,11 @@ def create_api_instance(
     password: str,
     port: int = 443,
     verify_ssl: bool = False,
-) -> GDSPhoneAPI | GNSNasAPI:
+) -> GDSPhoneAPI | GNSNasAPI | GWNSwitchAPI:
     """Create API instance based on device type.
 
     Args:
-        device_type: Device type ("GDS" or "GNS")
+        device_type: Device type ("GDS", "GNS", or "GWN_SWITCH")
         host: Device IP or hostname
         username: Login username
         password: Login password
@@ -431,15 +458,24 @@ def create_api_instance(
         verify_ssl: Whether to verify SSL certificate
 
     Returns:
-        API instance (GDSPhoneAPI or GNSNasAPI)
+        API instance (GDSPhoneAPI, GNSNasAPI, or GWNSwitchAPI)
 
     """
     # Import here to avoid circular import
     from grandstream_home_api.gds import GDSPhoneAPI
     from grandstream_home_api.gns import GNSNasAPI
+    from grandstream_home_api.gwn_switch import GWNSwitchAPI
 
     if device_type == DEVICE_TYPE_GNS_NAS:
         return GNSNasAPI(
+            host,
+            username,
+            password,
+            port=port,
+            verify_ssl=verify_ssl,
+        )
+    if device_type == DEVICE_TYPE_GWN_SWITCH:
+        return GWNSwitchAPI(
             host,
             username,
             password,
@@ -455,7 +491,43 @@ def create_api_instance(
     )
 
 
-def attempt_login(api: GDSPhoneAPI | GNSNasAPI) -> tuple[bool, str | None]:
+def create_device_api_instance(
+    device_type: str,
+    host: str,
+    username: str,
+    password: str,
+    port: int = 443,
+    verify_ssl: bool = False,
+) -> GDSPhoneAPI:
+    """Create a GDS/GSC device API instance.
+
+    Returns a GDSPhoneAPI instance suitable for the Home Assistant
+    integration which only supports GDS and GSC device types.
+
+    Args:
+        device_type: Device type ("GDS" or "GSC")
+        host: Device IP or hostname
+        username: Login username
+        password: Login password
+        port: Port number
+        verify_ssl: Whether to verify SSL certificate
+
+    Returns:
+        GDSPhoneAPI instance
+
+    """
+    from grandstream_home_api.gds import GDSPhoneAPI
+
+    return GDSPhoneAPI(
+        host=host,
+        username=username,
+        password=password,
+        port=port,
+        verify_ssl=verify_ssl,
+    )
+
+
+def attempt_login(api: GDSPhoneAPI | GNSNasAPI | GWNSwitchAPI) -> tuple[bool, str | None]:
     """Attempt to login to device API.
 
     Args:
@@ -866,6 +938,30 @@ def fetch_gns_metrics(api) -> dict[str, Any] | None:
 
     Args:
         api: GNSNasAPI instance
+
+    Returns:
+        Dictionary with system metrics, or None if failed
+
+    """
+    if not hasattr(api, "get_system_metrics"):
+        return None
+
+    try:
+        result = api.get_system_metrics()
+        if not isinstance(result, dict):
+            return None
+
+        result.setdefault("device_status", "online")
+        return result
+    except (RuntimeError, ValueError, OSError):
+        return None
+
+
+def fetch_gwn_switch_metrics(api) -> dict[str, Any] | None:
+    """Fetch GWN Switch device metrics.
+
+    Args:
+        api: GWNSwitchAPI instance
 
     Returns:
         Dictionary with system metrics, or None if failed

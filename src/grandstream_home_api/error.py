@@ -9,6 +9,14 @@ class GrandstreamLoginError(GrandstreamError):
     """Exception raised when login fails."""
 
 
+class GrandstreamSessionExpiredError(GrandstreamError):
+    """Exception raised when the device reports an expired/invalid session.
+
+    Triggered by auth failures (code 401 / ``logout:1`` / ``notAuth``) so the
+    caller can re-authenticate and retry.
+    """
+
+
 class GrandstreamAuthTokenError(GrandstreamError):
     """Exception raised when access token acquisition fails."""
 

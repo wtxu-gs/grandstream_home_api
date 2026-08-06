@@ -17,6 +17,9 @@ DEFAULT_RTSP_PORT = 554
 DEVICE_TYPE_GDS: Final[Literal["GDS"]] = "GDS"
 DEVICE_TYPE_GNS_NAS: Final[Literal["GNS"]] = "GNS"
 DEVICE_TYPE_GSC: Final[Literal["GSC"]] = "GSC"  # GSC devices use GDS API internally
+DEVICE_TYPE_GWN_SWITCH: Final[Literal["GWN_SWITCH"]] = "GWN_SWITCH"
+DEVICE_TYPE_GWN_ROUTER: Final[Literal["GWN_ROUTER"]] = "GWN_ROUTER"
+DEVICE_TYPE_GWN_AP: Final[Literal["GWN_AP"]] = "GWN_AP"
 
 # Door unlock API constants
 ACCESS_TOKEN_TTL = 3300  # 55 minutes in seconds
