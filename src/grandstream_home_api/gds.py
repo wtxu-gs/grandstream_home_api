@@ -195,8 +195,9 @@ class GDSPhoneAPI:
         self._is_authenticated: bool = False
         self._is_online: bool = False
 
-        # Home Assistant control status tracking
-        self._is_ha_control_enabled: bool = True  # Default to True, will be set to False if "user is not allow" error occurs
+        # Home Assistant control status tracking. Defaults to True and is set to
+        # False if a "user is not allow" error occurs
+        self._is_ha_control_enabled: bool = True
 
         # Access token management for unlock_door feature
         self._access_token: str | None = None
@@ -534,7 +535,8 @@ class GDSPhoneAPI:
                 time_since_last_attempt = time.time() - self._last_login_attempt
                 if time_since_last_attempt < 300:
                     raise RuntimeError(
-                        f"Too many login failures. Will wait {int(300 - time_since_last_attempt)} seconds before retrying"
+                        "Too many login failures. Will wait "
+                        f"{int(300 - time_since_last_attempt)} seconds before retrying"
                     )
                 # Reset counter after waiting period
                 self._login_failed_count = 0
@@ -943,6 +945,27 @@ class GDSPhoneAPI:
 
         if response.get("response") == RESPONSE_SUCCESS:
             _LOGGER.debug("RTSP info retrieved: %s", response)
+
+        return response
+
+    @_require_auth
+    @_handle_session_retry
+    def get_digital_input_status(self) -> dict[str, Any]:
+        """Get current digital input port states.
+
+        Returns:
+            dict with keys diInputId1/2/3, each containing diMode, diTriggerMode,
+            diEventState, plus a top-level "response" field.
+
+        """
+        headers = self._build_headers()
+        params = {"type": "digital_input_status", "cmd": "get"}
+        response = self._make_request(
+            HTTP_METHOD_GET, ENDPOINT_GDS_GNS_CONFIG, headers=headers, params=params
+        )
+
+        if response.get("response") == RESPONSE_SUCCESS:
+            _LOGGER.debug("Digital input status retrieved: %s", response)
 
         return response
 
@@ -1416,9 +1439,11 @@ class GDSPhoneAPI:
                 GrandstreamChallengeError,
             ) as err:
                 # Recoverable errors that can be retried:
-                # - GrandstreamSignatureError: Signature verification failed (-100) → refresh token
-                # - GrandstreamAuthTokenError: Material empty (-200), timestamp expired (-300), permission denied (-400) → refresh token
-                # - GrandstreamChallengeError: Challenge code invalid (-500) → get new challenge (no token refresh needed)
+                # - GrandstreamSignatureError: verification failed (-100) → refresh token
+                # - GrandstreamAuthTokenError: material empty (-200), timestamp expired
+                #   (-300), permission denied (-400) → refresh token
+                # - GrandstreamChallengeError: challenge code invalid (-500) → get new
+                #   challenge (no token refresh needed)
                 if retry_count < max_retries:
                     error_type = type(err).__name__
 

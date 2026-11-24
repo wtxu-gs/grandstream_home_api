@@ -98,7 +98,7 @@ __all__ = [
     "attempt_login",
     "build_sip_account_dict",
     "create_api_instance",
-    "create_gds_api_instance",
+    "create_device_api_instance",
     "decrypt_password",
     "detect_device_type",
     "determine_device_type_from_product",

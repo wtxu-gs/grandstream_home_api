@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "grandstream-home-api"
-version = "0.1.7"
+version = "0.1.8"
 description = "Python API library for Grandstream GDS/GSC, GNS and GWN Switch devices"
 readme = "README.md"
 license = "Apache-2.0"
